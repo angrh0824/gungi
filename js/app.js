@@ -1009,6 +1009,7 @@
     const seg = (id, items, val) => { $(id).innerHTML = items.map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="${val === v}">${l}</button>`).join(''); };
     seg('ng-mode', [['cpu', 'CPUと対局'], ['pvp', 'ふたりで対局'], ['watch', 'CPUどうしを観戦']], draft.mode);
     $('ng-cpu').innerHTML = CPU_KEYS.map(k => `<button type="button" data-v="${k}" aria-pressed="${draft.cpu === k}"><span class="stars">${'★'.repeat(CPU[k].stars)}${'☆'.repeat(4 - CPU[k].stars)}</span><b>${CPU[k].label}</b><small>${CPU[k].desc}</small></button>`).join('');
+    $('ng-cpu-desc').textContent = CPU[draft.cpu] ? CPU[draft.cpu].desc : '';
     seg('ng-side', [['black', '先手（先に指す）'], ['white', '後手'], ['random', 'ランダム']], draft.side);
     seg('ng-cpu-b', CPU_KEYS.map(k => [k, CPU[k].label]), draft.cpuB);
     seg('ng-cpu-w', CPU_KEYS.map(k => [k, CPU[k].label]), draft.cpuW);
@@ -1075,16 +1076,9 @@
   }
 
   function renderRules() {
-    const order = [SUI, G.TAI, G.CHU, G.SHO, G.SAM, G.YAR, G.KIB, G.SIN, G.TOR, G.HYO, G.YUM, G.TSU, G.HOO, G.BOU];
-    const cards = order.map(t => `
-      <div class="pcard">
-        <div class="hd">${discHTML(BLACK, t)}<div><b>${NAMES[t]}</b><small>${G.PIECE_COUNT[t]}枚${t >= G.YUM ? '・特殊駒' : ''}</small></div></div>
-        <div class="mini" id="mini-${t}">${diagram(t, 1)}</div>
-        <div class="tierbtns" data-t="${t}">${[1, 2, 3].map(k => `<button type="button" data-k="${k}" aria-pressed="${k === 1}">${k}段</button>`).join('')}</div>
-        <p style="margin:6px 0 0;font-size:12px">${MOVE_TEXT[t]}</p>
-      </div>`).join('');
+    const chips = PIECE_ORDER.map(t => `<button type="button" data-t="${t}" aria-pressed="${t === SUI}" title="${NAMES[t]}">${discHTML(BLACK, t)}</button>`).join('');
     $('view-rules').innerHTML = `
-      <div class="card">
+      <div class="card" data-tab="遊び方">
         <h3>遊び方</h3>
         <ul>
           <li>9×9の盤で、相手の<b>帥（スイ）</b>を取るか<b>詰み</b>にすれば勝ち。同じ局面が4回で<b>千日手</b>（引き分け）。</li>
@@ -1097,24 +1091,24 @@
           <li>弓・筒・砲は駒を<b>飛び越えて</b>動けます（自分の段より高い駒は飛び越えられません）。それ以外の駒は途中に駒があると止まります。</li>
         </ul>
       </div>
-      <div class="card">
+      <div class="card" data-tab="配置">
         <h3>初期配置</h3>
         <p>公式では<b>入門・初級は固定配置</b>、<b>中級・上級は自由配置</b>です。このアプリでは「新しい対局」でどの段階でも切り替えられます。</p>
-        <p><b>自由配置</b>：先手から交互に自陣3段へ1枚ずつ置き（最初は帥）、「済」で終わります。先手が先に済としても後手は配置を続けられ、後手が済とした時点で対局開始（先手から）。「おまかせ配置」でCPUの型に沿って置くこともできます。</p>
-        <div class="stat-row" style="margin-top:8px">
-          <div><b>入門の固定配置</b>${setupDiagram('nyumon')}</div>
-          <div><b>初級の固定配置</b>${setupDiagram('shokyu')}</div>
-          <div><b>中級・上級の固定配置</b>${setupDiagram('jokyu')}</div>
+        <p><b>自由配置</b>：先手から交互に自陣3段へ1枚ずつ置き（最初は帥）、「済」で終わります。後手が済とした時点で対局開始（先手から）。「おまかせ」でCPUの型どおりに置けます。</p>
+        <p class="hint">下は固定配置のときの並び（先手側）。</p>
+        <div class="setup3" style="margin-top:8px">
+          <div><b>入門</b>${setupDiagram('nyumon')}</div>
+          <div><b>初級</b>${setupDiagram('shokyu')}</div>
+          <div><b>中級・上級</b>${setupDiagram('jokyu')}</div>
         </div>
         <p class="hint">固定配置の並びは公式のものを確認できなかったため、このアプリ独自のものです。</p>
       </div>
-      <div class="card">
+      <div class="card" data-tab="駒の動き">
         <h3>駒の動き</h3>
-        <div class="legend"><span style="--c:var(--pc-black)">駒の位置</span><span style="--c:color-mix(in srgb, var(--accent) 55%, var(--surface-2))">動ける</span><span style="--c:color-mix(in srgb, var(--accent) 30%, var(--surface-2))">どこまでも</span><span style="--c:color-mix(in srgb, var(--gold) 70%, var(--surface-2))">飛び越えて着地</span></div>
-        <p class="hint" style="margin:6px 0 10px">先手から見た図（上が前）。段ボタンで2段目・3段目の利きを確認できます。対局中も、盤の駒にマウスを乗せると利きが表示されます。</p>
-        <div class="pieces-grid">${cards}</div>
+        <div class="pchips" id="pchips">${chips}</div>
+        <div class="pview" id="pview"></div>
       </div>
-      <div class="card">
+      <div class="card" data-tab="段階">
         <h3>ルールの段階</h3>
         <div class="tbl"><table class="lv"><thead><tr><th>段階</th><th>公式の配置</th><th>使う駒</th><th>ツケ</th><th>帥のツケ</th></tr></thead><tbody>
           <tr><td>入門</td><td>固定</td><td>特殊駒なし（20枚）</td><td>2段</td><td>なし</td></tr>
@@ -1123,7 +1117,7 @@
           <tr><td>上級</td><td>自由</td><td>全14種（25枚）</td><td>3段</td><td>あり</td></tr>
         </tbody></table></div>
       </div>
-      <div class="card src">
+      <div class="card src" data-tab="出典">
         <h3>出典</h3>
         <ul style="font-size:13px">
           <li><a href="https://www.universal-music.co.jp/other/hunter-gungi__qa/" target="_blank" rel="noopener">HUNTER×HUNTER 軍儀 Q＆A（ユニバーサル ミュージック）</a>：ツケ・取り・新・帥・謀の扱い、段階ごとの配置</li>
@@ -1132,6 +1126,42 @@
           <li><a href="https://note.com/roggysan_phd/n/n903eeed54e90" target="_blank" rel="noopener">ロジーさん「軍儀の考察 第二弾 公式ルールと棋譜」</a>：段階ごとの違い・千日手</li>
         </ul>
       </div>`;
+    renderPiece(SUI, 1);
+    docTabs($('view-rules'), 'rules');
+  }
+
+  // 駒図鑑: 1つの駒の動きを大きな図で（段ボタンで2段目・3段目）
+  const PIECE_ORDER = [SUI, G.TAI, G.CHU, G.SHO, G.SAM, G.YAR, G.KIB, G.SIN, G.TOR, G.HYO, G.YUM, G.TSU, G.HOO, G.BOU];
+  function renderPiece(t, k) {
+    $('pview').innerHTML = `
+      <div class="mini">${diagram(t, k)}</div>
+      <div class="info">
+        <h4>${NAMES[t]}</h4>
+        <span class="hint">${G.PIECE_COUNT[t]}枚${t >= G.YUM ? '・特殊駒' : ''}</span>
+        <div class="tierbtns" data-t="${t}" style="max-width:220px">${[1, 2, 3].map(x => `<button type="button" data-k="${x}" aria-pressed="${x === k}">${x}段目</button>`).join('')}</div>
+        <p>${MOVE_TEXT[t]}</p>
+        <div class="legend"><span style="--c:var(--pc-black)">駒の位置</span><span style="--c:color-mix(in srgb, var(--accent) 55%, var(--surface-2))">動ける</span><span style="--c:color-mix(in srgb, var(--accent) 30%, var(--surface-2))">どこまでも</span><span style="--c:color-mix(in srgb, var(--gold) 70%, var(--surface-2))">飛び越えて着地</span></div>
+        <p class="hint">先手から見た図（上が前）。段が上がるほど利きが伸びます。対局中は、盤の駒をタップするとその場で利きを見られます。</p>
+      </div>`;
+    $('pchips').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.t) === t)));
+  }
+
+  // 読み物のページ（ルール・AI）は、カードの見出しからタブを作って1枚ずつ見せる（ページを長くスクロールしない）
+  function docTabs(view, key) {
+    const cards = [...view.querySelectorAll(':scope > .card')];
+    if (cards.length < 2) return;
+    const bar = document.createElement('div');
+    bar.className = 'doctabs'; bar.setAttribute('role', 'tablist');
+    bar.innerHTML = cards.map((c, i) => `<button role="tab" data-i="${i}">${esc(c.dataset.tab || (c.querySelector('h3') || {}).textContent || i + 1)}</button>`).join('');
+    view.prepend(bar);
+    const show = i => {
+      cards.forEach((c, j) => { c.hidden = j !== i; });
+      bar.querySelectorAll('button').forEach((b, j) => b.setAttribute('aria-selected', String(j === i)));
+      store.set('doctab-' + key, i);
+      document.querySelector('main').scrollTop = 0;
+    };
+    bar.addEventListener('click', e => { const b = e.target.closest('button'); if (b) show(Number(b.dataset.i)); });
+    show(Math.min(store.get('doctab-' + key, 0), cards.length - 1));
   }
 
   function renderAIPage() {
@@ -1178,19 +1208,21 @@
       return `<tr><td>${G.LEVELS[lv].name}</td>${cells}</tr>`;
     }).join('');
     $('view-ai').innerHTML = `
-      <div class="card">
+      <div class="card" data-tab="強さ">
         <h3>このAIの強さ</h3>
         <div class="stat-row">
           <div class="stat"><b>${gen}</b><span>学習世代</span></div>
           <div class="stat"><b>${total.toLocaleString()}</b><span>自己対局（累計局数）</span></div>
           <div class="stat"><b>${acc.length}</b><span>採用された更新</span></div>
           ${vs ? `<div class="stat"><b>${(vs.score * 100).toFixed(1)}%</b><span>${vs.anchor || '初期版'}との直接対戦の勝率（第${vs.gen}世代・${vs.games}局・Elo ${vs.elo >= 0 ? '+' : ''}${vs.elo}±${vs.eloErr}）</span></div>` : ''}
-          <div class="stat"><b>+${cum}</b><span>各世代の上昇幅の合計（目安。実際より大きめに出ます）</span></div>
+          <div class="stat wide-only"><b>+${cum}</b><span>各世代の上昇幅の合計（目安。実際より大きめに出ます）</span></div>
         </div>
-        ${mchart ? `<p class="hint" style="margin:14px 0 6px"><b>実測の強さ</b>：${anchorName === '初期版' ? '初期版（手作りの評価関数・旧来の探索）' : anchorName + 'のAI'}と先後入れ替えで直接対戦したときの Elo 差。縦線は誤差の目安。</p>${mchart}` : ''}
-        ${chart ? `<p class="hint" style="margin:14px 0 6px">世代ごとの検定：「学習した新版 vs それまでの版」を対戦し、勝ち越したら採用（緑）。線はその上昇幅の合計（目安）。</p>${chart}` : '<p>まだ学習していません。</p>'}
+        <div class="charts2">
+        ${mchart ? `<div><p class="hint" style="margin:14px 0 6px"><b>実測の強さ</b>：${anchorName === '初期版' ? '初期版（手作りの評価関数・旧来の探索）' : anchorName + 'のAI'}と先後入れ替えで直接対戦したときの Elo 差。縦線は誤差の目安。</p>${mchart}</div>` : ''}
+        ${chart ? `<div class="wide-only"><p class="hint" style="margin:14px 0 6px">世代ごとの検定：「学習した新版 vs それまでの版」を対戦し、勝ち越したら採用（緑）。線はその上昇幅の合計（目安）。</p>${chart}</div>` : '<p>まだ学習していません。</p>'}
+        </div>
       </div>
-      <div class="card">
+      <div class="card" data-tab="しくみ">
         <h3>しくみ</h3>
         <ul>
           <li><b>探索</b>：将棋・チェスのソフトと同じ αβ 探索（反復深化・置換表・静止探索・Null Move・LMR・枝刈り）。ブラウザでも1秒に数十万局面を読みます。</li>
@@ -1199,16 +1231,17 @@
           <li><b>評価値</b>：勝率 = 1 / (1 + e<sup>−評価値/600</sup>) になるよう学習しているので、評価値+600で先手の勝率は約73%です。</li>
           <li><b>GPUは不要</b>：この方式はCPUだけで速く学習できます。</li>
         </ul>
-        <table class="lv" style="margin-top:8px"><thead><tr><th>CPUの強さ</th><th>1手の考える時間</th><th>特徴</th></tr></thead><tbody>
+        <table class="lv wide-only" style="margin-top:8px"><thead><tr><th>CPUの強さ</th><th>1手の考える時間</th><th>特徴</th></tr></thead><tbody>
           ${CPU_KEYS.map(k => `<tr><td>${CPU[k].label}</td><td>${CPU[k].time / 1000}秒</td><td>${CPU[k].desc}</td></tr>`).join('')}
         </tbody></table>
       </div>
       ${bookHTML()}
-      <div class="card">
+      <div class="card" data-tab="最初の型">
         <h3>最初に用意した配置の型（中級・上級）</h3>
         <p class="hint">学習の出発点にした6つの型。数字は自己対局でその型を使った側の勝率（局数）。</p>
         <div class="tbl"><table class="lv"><thead><tr><th>段階</th>${G.TEMPLATES.map(t => `<th>${t.name}</th>`).join('')}</tr></thead><tbody>${tplRows}</tbody></table></div>
       </div>`;
+    docTabs($('view-ai'), 'ai');
   }
 
   // 学習で見つけた自由配置の型（自陣3段を先手から見た図。重なりは段数つき）
@@ -1240,7 +1273,7 @@
       </div>`;
     });
     if (!parts.length) return '';
-    return `<div class="card">
+    return `<div class="card" data-tab="学習した配置">
       <h3>学習した自由配置</h3>
       <p class="hint">配置の型を自己対局で戦わせ、勝った型を少しずつ変えて残す「進化」で見つけた並べ方です。CPUの自由配置と「おまかせ配置」はこの型を使います。図は自陣の3段（上が前）。</p>
       <div class="stat-row" style="align-items:flex-start">${parts.join('')}</div>
@@ -1256,11 +1289,10 @@
       if (b.dataset.tab === 'ai') renderAIPage();
     }));
     $('view-rules').addEventListener('click', e => {
+      const chip = e.target.closest('#pchips button');
+      if (chip) { renderPiece(Number(chip.dataset.t), 1); return; }
       const b = e.target.closest('.tierbtns button');
-      if (!b) return;
-      const t = Number(b.parentElement.dataset.t), k = Number(b.dataset.k);
-      $('mini-' + t).innerHTML = diagram(t, k);
-      b.parentElement.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+      if (b) renderPiece(Number(b.parentElement.dataset.t), Number(b.dataset.k));
     });
     document.addEventListener('click', e => {
       const hp = e.target.closest('.hp');
@@ -1307,6 +1339,7 @@
       else if (nav === 'prev') viewPly(shownPly() - 1);
       else if (nav === 'next') viewPly(shownPly() + 1);
       else if (nav === 'last') viewPly(S.moves.length);
+      else if (nav === 'sheet') { if ($('side').classList.contains('open')) closeSheet(); else openSheet('kifu'); }
       else if (b.dataset.ply != null) viewPly(Number(b.dataset.ply));
     });
     // AI補助: 形勢と矢印をまとめて出し入れ（どちらかが出ていれば両方隠す）
@@ -1318,8 +1351,8 @@
       $('btn-more').setAttribute('aria-expanded', String(!m.hidden));
     });
     $('menu-more').addEventListener('click', () => { $('menu-more').hidden = true; $('btn-more').setAttribute('aria-expanded', 'false'); });
-    $('btn-panel').addEventListener('click', () => { document.querySelector('.side').scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' }); });
-    window.addEventListener('resize', fitBoardSoon);
+    $('btn-panel').addEventListener('click', () => openSheet(settings.showEval ? 'graph' : 'kifu'));
+    window.addEventListener('resize', () => { fitBoardSoon(); if ($('side').classList.contains('open')) placeSheet(); });
     $('btn-online').addEventListener('click', openOnline);
     $('on-close').addEventListener('click', () => { $('dlg-online').hidden = true; });
     $('dlg-online').addEventListener('click', e => {
@@ -1367,10 +1400,14 @@
       el.checked = settings[k];
       el.addEventListener('change', () => setSetting(k, el.checked));
     });
-    // 評価値の行: 押すと読み筋を開閉
-    const toggleMore = () => { S.evOpen = !S.evOpen; renderEval(); };
-    $('evstrip').addEventListener('click', toggleMore);
-    $('evstrip').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleMore(); } });
+    // 評価値の行を押すと、振り返りパネルの「形勢」（読み筋・深さ）
+    $('evstrip').addEventListener('click', () => openSheet('ev'));
+    $('evstrip').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSheet('ev'); } });
+    $('side').addEventListener('click', e => {
+      const t = e.target.closest('[data-st]');
+      if (t) { openSheet(t.dataset.st); return; }
+      if (e.target.closest('[data-act="sheet-close"]')) closeSheet();
+    });
     document.querySelector('.evoff-card button').addEventListener('click', () => setSetting('showEval', true));
     $('kifu').addEventListener('click', e => { const li = e.target.closest('li'); if (li) viewPly(Number(li.dataset.ply)); });
     $('graph').addEventListener('click', e => {
@@ -1414,7 +1451,7 @@
     $('rs-review').addEventListener('click', () => { $('dlg-result').hidden = true; viewPly(0); });
     $('dlg-result').addEventListener('click', e => { if (e.target === $('dlg-result')) $('dlg-result').hidden = true; });
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') { hideChooser(); ['dlg-new', 'dlg-result', 'dlg-import', 'dlg-online'].forEach(id => { $(id).hidden = true; }); $('settings').hidden = true; $('menu-more').hidden = true; if (S.sel || S.inspect >= 0) clearSel(); return; }
+      if (e.key === 'Escape') { closeSheet(); hideChooser(); ['dlg-new', 'dlg-result', 'dlg-import', 'dlg-online'].forEach(id => { $(id).hidden = true; }); $('settings').hidden = true; $('menu-more').hidden = true; if (S.sel || S.inspect >= 0) clearSel(); return; }
       if (e.target.closest('input, textarea, .dialog') || !$('view-play').offsetParent) return;
       if (e.key === 'ArrowLeft') { e.preventDefault(); viewPly(shownPly() - 1); }
       if (e.key === 'ArrowRight') { e.preventDefault(); viewPly(shownPly() + 1); }
@@ -1583,8 +1620,26 @@
           : `${seg('lv', G.LEVEL_KEYS.map(k => [k, G.LEVELS[k].name]), lobby.lv)}${seg('su', [['fixed', '固定配置'], ['free', '自由配置']], lobby.su)}
              <div><button class="btn primary" data-act="wait"${st === 'on' ? '' : ' disabled'}>この設定で待つ</button></div>`}
       </div>
-      <p class="hint">通信には公開の中継サーバー（MQTT）を使います。名前と指し手は、ほかの人からも見える可能性があります。オンライン対局では「待った」はできません。</p>`;
+      <p class="hint on-note">公開の中継サーバーを使うため、名前と指し手はほかの人からも見える可能性があります。オンラインでは「待った」はできません。</p>`;
   }
+
+  // 振り返りパネル: 狭い画面だけ。盤のすぐ下から画面の下までを覆い、盤は見えたまま（グラフや棋譜を押すとその局面へ）
+  const narrow = () => window.matchMedia('(max-width: 979px)').matches;
+  function placeSheet() {
+    const fr = document.querySelector('.board-frame').getBoundingClientRect(), h = window.innerHeight;
+    $('side').style.setProperty('--sheet-top', Math.round(Math.min(h * 0.68, Math.max(h * 0.3, fr.bottom + 6))) + 'px');
+  }
+  function openSheet(tab) {
+    const side = $('side');
+    if (!settings.showEval && (tab === 'ev' || tab === 'graph')) tab = 'kifu';
+    side.dataset.tab = tab;
+    side.querySelectorAll('.sheet-tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.st === tab)));
+    if (!narrow()) return; // 広い画面では右に常に出ている
+    placeSheet();
+    side.classList.add('open');
+    renderKifu(); renderGraph();
+  }
+  function closeSheet() { $('side').classList.remove('open'); }
 
   function setSetting(k, v, quiet) {
     settings[k] = v; store.set('settings', settings);
